@@ -28,8 +28,10 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-
-    raise NotImplementedError
+    from cs336_basics.modules import Linear
+    linear = Linear(d_in,d_out)
+    linear.weight.data = weights.clone()
+    return linear(in_features)
 
 
 def run_embedding(
@@ -51,8 +53,10 @@ def run_embedding(
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
 
-    raise NotImplementedError
-
+    from cs336_basics.modules import Embedding
+    embedd = Embedding(vocab_size,d_model)
+    embedd.weight.data = weights
+    return embedd(token_ids)
 
 def run_swiglu(
     d_model: int,
@@ -83,7 +87,12 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    from cs336_basics.modules import Swiglu
+    swiglu = Swiglu(d_model,d_ff)
+    swiglu.w1.weight.data = w1_weight
+    swiglu.w2.weight.data = w2_weight
+    swiglu.w3.weight.data = w3_weight
+    return swiglu(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -104,7 +113,8 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    raise NotImplementedError
+    from cs336_basics.modules import scaled_dot_product_attention
+    return scaled_dot_product_attention(Q,K,V,mask)
 
 
 def run_multihead_self_attention(
@@ -138,7 +148,13 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    from cs336_basics.modules import MultiHeadSelfAttention
+    mha = MultiHeadSelfAttention(d_model,num_heads)
+    mha.Q.weight.data = q_proj_weight
+    mha.K.weight.data = k_proj_weight
+    mha.V.weight.data = v_proj_weight
+    mha.O.weight.data = o_proj_weight
+    return mha(in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -178,7 +194,13 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    from cs336_basics.modules import MultiHeadSelfAttention
+    mha = MultiHeadSelfAttention(d_model,num_heads,max_seq_len,theta)
+    mha.Q.weight.data = q_proj_weight
+    mha.K.weight.data = k_proj_weight
+    mha.V.weight.data = v_proj_weight
+    mha.O.weight.data = o_proj_weight
+    return mha(in_features,token_positions,True)
 
 
 def run_rope(

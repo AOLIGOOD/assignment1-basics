@@ -163,12 +163,22 @@ class RoPE(nn.Module):
 
 
 class RMSNorm(nn.Module):
-    def __init__(self, d_model, eps=1e-5, device=None, dtype=None):
+    def __init__(self, d_model: int, weights: Float[Tensor, " d_model"],eps=1e-5, device=None, dtype=None):
+        super().__init__()
         # 初始化 gain 参数
-        pass
+        self.gain = nn.Parameter(weights)
+        self.d_model = d_model
+        self.eps = eps
     
-    def forward(self, x):
+    def forward(self, x:Float[Tensor, " ... d_model"])->Float[Tensor, " ... d_model"]:
         # 实现 RMSNorm
         # 注意：需要 upcast 到 float32
-        pass
+        in_dtype = x.dtype
+        x = x.to(torch.float32)
+        gain = self.gain.to(torch.float32)
+        eps = self.eps
+        d_model = self.d_model
+        rms = torch.sqrt(torch.mean(x ** 2, dim=-1, keepdim=True)+eps)
+        result = (x/rms) * gain
+        return result.to(in_dtype)        
 

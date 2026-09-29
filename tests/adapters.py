@@ -295,7 +295,10 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    from cs336_basics.modules import TransformerBlock
+    block = TransformerBlock(d_model,num_heads,d_ff,max_seq_len,theta,weights)
+
+    return block(in_features)
 
 
 def run_transformer_lm(
@@ -416,7 +419,8 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    raise NotImplementedError
+    from cs336_basics.modules import Silu
+    return Silu(in_features)
 
 
 def run_get_batch(
@@ -455,7 +459,8 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    raise NotImplementedError
+    from cs336_basics.modules import softmax
+    return softmax(in_features,dim) 
 
 
 def run_cross_entropy(

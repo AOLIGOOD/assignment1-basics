@@ -36,7 +36,7 @@ class Embedding(nn.Module):
         # 索引查找
         return self.weight[token_ids]
 
-def Silu(x):
+def Silu(x: Float[Tensor, " ..."]) ->Float [Tensor, " ..."]:
     return x/(torch.ones_like(x) + torch.exp(-x))
 
 class Swiglu(nn.Module):
@@ -45,9 +45,9 @@ class Swiglu(nn.Module):
         if d_ff == 0:
             d_ff = int((8/3) * d_model)
             d_ff = ((d_ff + 63) // 64) * 64
-        self.w1 = Linear(d_ff,d_model)
-        self.w2 = Linear(d_model,d_ff)
-        self.w3 = Linear(d_ff,d_model)
+        self.w1 = Linear(d_model,d_ff)
+        self.w2 = Linear(d_ff,d_model)
+        self.w3 = Linear(d_model,d_ff)
     
     def forward(self,x):
         gate = self.w1(x)
@@ -73,7 +73,7 @@ def scaled_dot_product_attention(
 
     return einsum(attention_weights,V,"... queries keys, ... keys d_v -> ... queries d_v")
 
-def softmax(input:Tensor,dim:int) -> torch.Tensor:
+def softmax(input: Float[Tensor, " ..."],dim: int) -> Float[Tensor, " ..."]:
     max_val, _ = torch.max(input,dim,keepdim=True)
     shifted = input - max_val
     e_x = torch.exp(shifted)
@@ -155,12 +155,6 @@ class RoPE(nn.Module):
         rotated[..., 1::2] = rotated_odd
         
         return rotated
-        
-        
-
-
-
-
 
 class RMSNorm(nn.Module):
     def __init__(self, d_model: int, weights: Float[Tensor, " d_model"],eps=1e-5, device=None, dtype=None):
@@ -182,3 +176,29 @@ class RMSNorm(nn.Module):
         result = (x/rms) * gain
         return result.to(in_dtype)        
 
+class TransformerBlock(nn.Module):
+    def __init__(self, d_model: int, num_heads: int, d_ff: int,  max_seq_len: int, theta: float, weights: dict[str, Tensor]):
+        super().__init__()
+        self.num_heads = num_heads
+        self.d_ff = d_ff
+        self.max_seq_len = max_seq_len
+
+        self.ln1 = RMSNorm(d_model, weights["ln1.weight"])
+        self.attn = MultiHeadSelfAttention(d_model, num_heads, max_seq_len, theta)
+        self.ln2 = RMSNorm(d_model, weights["ln2.weight"])
+        self.ffn = Swiglu(d_model, d_ff)
+
+        with torch.no_grad():
+            self.attn.Q.weight.copy_(weights["attn.q_proj.weight"])
+            self.attn.K.weight.copy_(weights["attn.k_proj.weight"])
+            self.attn.V.weight.copy_(weights["attn.v_proj.weight"])
+            self.attn.O.weight.copy_(weights["attn.output_proj.weight"])
+            self.ffn.w1.weight.copy_(weights["ffn.w1.weight"])
+            self.ffn.w2.weight.copy_(weights["ffn.w2.weight"])
+            self.ffn.w3.weight.copy_(weights["ffn.w3.weight"])
+
+
+    def forward(self, input: Float[Tensor, " batch sequence_length d_model"]) -> Float[Tensor, "batch sequence_length d_model"]:
+        input = input + self.attn(self.ln1(input),use_rope=True)
+        input = input + self.ffn(self.ln2(input))
+        return input

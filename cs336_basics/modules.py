@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import math
 from einops import einsum,rearrange
+from typing import Iterable
 
 def init_weight(weight):
     in_features, out_features = weight.shape[0], weight.shape[1]
@@ -78,6 +79,76 @@ def softmax(input: Float[Tensor, " ..."],dim: int) -> Float[Tensor, " ..."]:
     shifted = input - max_val
     e_x = torch.exp(shifted)
     return e_x/torch.sum(e_x,dim,keepdim=True)
+
+def cross_entropy(
+    inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]
+) -> Float[Tensor, ""]:
+    max_val, _ = torch.max(inputs,dim=-1,keepdim=True)
+    shifted = inputs - max_val
+    log_sum_exp = torch.exp(shifted).sum(dim=-1,keepdim=True).log()
+    log_probs = shifted - log_sum_exp
+    nll = -log_probs[torch.arange(inputs.shape[0]), targets]
+    return nll.mean()
+
+def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
+    params = [p for p in parameters if p.grad is not None]
+    if not params:
+        return
+    
+    with torch.no_grad():
+        total_norm = torch.sqrt(sum((p.grad ** 2).sum() for p in params))
+        if total_norm > max_l2_norm:
+            scale = max_l2_norm/(total_norm + 1e-6)
+            for p in params:
+                p.grad.mul_(scale)
+
+class AdamW(torch.optim.Optimizer):
+    def __init__(self, params, lr = 1e3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.01):
+        defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
+        super().__init__(params, defaults)
+
+    @torch.no_grad()
+    def step(self, closure = None):
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+
+        for group in self.param_groups:
+            lr = group['lr']
+            b1, b2 = group['betas']
+            eps = group['eps']
+            wd = group['weight_decay']
+
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+                g = p.grad
+                state = self.state[p]
+
+                if len(state) == 0:
+                    state["m"] = torch.zeros_like(p)
+                    state["v"] = torch.zeros_like(p)
+                    state["step"] = 0
+
+                state["step"] += 1
+                t = state["step"]
+                m, v = state["m"], state["v"]
+
+                m.mul_(b1).add_(g, alpha=1 - b1)
+                v.mul_(b2).addcmul_(g, g, value=1 - b2)
+
+                m_hat = m / (1 - b1 ** t)
+                v_hat = v / (1 - b2 ** t)
+
+                p.mul_(1 - lr * wd)
+                p.add_(m_hat / (v_hat.sqrt() + eps), alpha=-lr)
+                
+        return loss
+
+
+            
+        
 
 class MultiHeadSelfAttention(nn.Module):
     def __init__(self, d_model: int, num_heads: int, max_seq_len: int = 1024, theta: float = 10000.0):
